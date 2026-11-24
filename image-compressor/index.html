@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Hutch Image Compressor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: one narrow working column. Size choice, then the drop area, then the results list with one download bar. */
+:root {
+  --bg: #F2F5F3;
+  --surface: #FFFFFF;
+  --fg: #14201C;
+  --muted: #5A6A64;
+  --line: #D3DBD7;
+  --accent: #0E6A51;
+  --accent-fg: #FFFFFF;
+  --accent-soft: #E0EFE9;
+  --warn: #8A5A00;
+  --warn-soft: #FBEFD2;
+  --bad: #A3271F;
+  --bad-soft: #FBE3E0;
+  --font-display: "Space Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F1513; --surface: #171F1C; --fg: #E6ECE9; --muted: #95A49E; --line: #2B3632;
+    --accent: #4DC49C; --accent-fg: #08241B; --accent-soft: #17312A;
+    --warn: #F0C36A; --warn-soft: #362B12; --bad: #F2948C; --bad-soft: #3A1D1A;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F1513; --surface: #171F1C; --fg: #E6ECE9; --muted: #95A49E; --line: #2B3632;
+  --accent: #4DC49C; --accent-fg: #08241B; --accent-soft: #17312A;
+  --warn: #F0C36A; --warn-soft: #362B12; --bad: #F2948C; --bad-soft: #3A1D1A;
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding-block: 40px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.brand {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+h1 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(28px, 5vw, 38px);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  margin: 6px 0 10px;
+  text-wrap: balance;
+}
+.lede { color: var(--muted); max-width: 60ch; margin: 0; }
+h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 16px;
+  margin: 0 0 10px;
+}
+
+/* Size choice */
+.presets { border: 0; padding: 0; margin: 0; min-width: 0; }
+.presets legend { font-family: var(--font-display); font-weight: 600; font-size: 16px; padding: 0; margin-bottom: 10px; }
+.preset-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.preset { position: relative; display: block; cursor: pointer; }
+.preset input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.preset-body {
+  display: flex; flex-direction: column; gap: 4px;
+  height: 100%;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.preset-name { font-weight: 600; }
+.preset-use { color: var(--muted); font-size: 13px; }
+.preset-spec { margin-top: auto; padding-top: 8px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.preset input:checked + .preset-body { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-soft); }
+.preset input:focus-visible + .preset-body { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Drop area */
+.drop {
+  border: 1.5px dashed var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 36px 20px;
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  transition: border-color .15s, background .15s;
+}
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop-title { font-family: var(--font-display); font-weight: 600; font-size: 19px; margin: 0; }
+.drop-sub { color: var(--muted); margin: 0; font-size: 13px; max-width: 46ch; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+
+button, .btn {
+  font: inherit; font-weight: 500;
+  border-radius: 8px;
+  padding: 9px 16px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--fg);
+  cursor: pointer;
+}
+button:hover, .btn:hover { border-color: var(--muted); }
+button:focus-visible, .btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+button.primary:hover { filter: brightness(1.08); }
+button:disabled { opacity: .5; cursor: default; }
+button.small { padding: 6px 12px; font-size: 13px; }
+.btn { position: relative; display: inline-block; }
+.btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+
+.notice {
+  border-radius: 10px; padding: 12px 14px; font-size: 14px;
+  background: var(--warn-soft); color: var(--warn);
+}
+
+/* Results */
+.bar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 16px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+}
+.totals { min-width: 0; }
+.totals strong { font-family: var(--font-display); font-size: 18px; font-variant-numeric: tabular-nums; }
+.totals span { display: block; color: var(--muted); font-size: 13px; }
+.progress { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.item {
+  display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  padding: 10px 12px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+}
+.thumb {
+  width: 56px; height: 56px; border-radius: 6px; object-fit: cover;
+  background: var(--bg);
+}
+.info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.name { font-weight: 500; overflow-wrap: anywhere; }
+.meta { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.side { display: flex; align-items: center; gap: 10px; }
+.chip {
+  font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+  background: var(--accent-soft); color: var(--accent); font-variant-numeric: tabular-nums;
+}
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chip.bad { background: var(--bad-soft); color: var(--bad); }
+.chip.wait { background: var(--bg); color: var(--muted); }
+.status { font-size: 14px; color: var(--muted); min-height: 1.5em; margin: 0; }
+.foot { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 18px; }
+.foot p { margin: 0 0 6px; max-width: 65ch; }
+
+@media (max-width: 560px) {
+  .preset-grid { grid-template-columns: 1fr; }
+  .item { grid-template-columns: 44px minmax(0, 1fr); }
+  .thumb { width: 44px; height: 44px; }
+  .side { grid-column: 1 / -1; justify-content: space-between; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main class="page">
+  <header>
+    <div class="brand">Hutch &amp; Co</div>
+    <h1>Image Compressor</h1>
+    <p class="lede">Make your photos the right size for your website before you upload them. Drop them in, pick a size, download the results. Your images stay on your computer and are never uploaded.</p>
+  </header>
+
+  <section class="presets" role="radiogroup" aria-labelledby="preset-h">
+    <h2 id="preset-h">1. Where will the image go?</h2>
+    <div class="preset-grid">
+      <label class="preset">
+        <input type="radio" name="preset" id="preset-full" value="full">
+        <span class="preset-body">
+          <span class="preset-name">Full-width photo</span>
+          <span class="preset-use">Page headers and backgrounds that span the screen</span>
+          <span class="preset-spec">Up to 2560 px · about 350 KB</span>
+        </span>
+      </label>
+      <label class="preset">
+        <input type="radio" name="preset" id="preset-standard" value="standard" checked>
+        <span class="preset-body">
+          <span class="preset-name">Standard</span>
+          <span class="preset-use">Images inside a section or an article</span>
+          <span class="preset-spec">Up to 1600 px · about 150 KB</span>
+        </span>
+      </label>
+      <label class="preset">
+        <input type="radio" name="preset" id="preset-small" value="small">
+        <span class="preset-body">
+          <span class="preset-name">Small</span>
+          <span class="preset-use">Cards, team photos and thumbnails</span>
+          <span class="preset-spec">Up to 800 px · about 80 KB</span>
+        </span>
+      </label>
+    </div>
+  </section>
+
+  <section aria-labelledby="drop-h">
+    <h2 id="drop-h">2. Add your images</h2>
+    <div class="drop" id="drop">
+      <p class="drop-title">Drop images or folders here</p>
+      <div class="row">
+        <label class="btn">Choose images<input type="file" id="pick-files" multiple accept="image/*,.heic,.heif"></label>
+        <label class="btn" id="pick-folder-wrap">Choose a folder<input type="file" id="pick-folder" webkitdirectory multiple></label>
+      </div>
+      <p class="drop-sub">JPG, PNG, WebP and AVIF are compressed to WebP. Logos saved as SVG are kept exactly as they are.</p>
+    </div>
+  </section>
+
+  <div class="notice" id="webp-notice" hidden>This browser cannot make WebP files, so photos will be saved as JPG instead. For smaller files, open this page in Chrome, Edge or Firefox.</div>
+
+  <section id="results" aria-labelledby="res-h" hidden>
+    <h2 id="res-h">3. Download</h2>
+    <div class="bar">
+      <div class="totals">
+        <strong id="total-line">0 images</strong>
+        <span id="total-sub"></span>
+      </div>
+      <div class="row">
+        <button type="button" id="clear">Clear</button>
+        <button type="button" id="save-all" class="primary" disabled>Download all (.zip)</button>
+      </div>
+    </div>
+    <div class="progress" id="progress" aria-hidden="true"><i id="progress-fill"></i></div>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+    <ul class="list" id="list"></ul>
+  </section>
+
+  <footer class="foot">
+    <p>Originals are never changed. Images are only ever made smaller, never enlarged, and camera data such as location is removed.</p>
+    <p>If a file shows "Could not read", open it on your computer and export it as a JPG first. This is common with HEIC photos from an iPhone.</p>
+  </footer>
+</main>
+
+<script>
+(() => {
+  "use strict";
+
+  const PRESETS = {
+    full:     { label: "Full-width photo", maxEdge: 2560, targetKB: 350 },
+    standard: { label: "Standard",         maxEdge: 1600, targetKB: 150 },
+    small:    { label: "Small",            maxEdge: 800,  targetKB: 80  },
+  };
+  const CEILING = 1.33;           // above target x this, the row is flagged
+  const Q_START = 0.82, Q_FLOOR = 0.58, Q_STEP = 0.06;
+  const SHRINK = 0.85, MAX_SHRINKS = 5;
+  const RASTER = /\.(jpe?g|png|webp|avif|heic|heif|tiff?|bmp)$/i;
+  const PASS = /\.(svg|gif)$/i;
+
+  const $ = (id) => document.getElementById(id);
+  const drop = $("drop"), list = $("list"), results = $("results");
+  const statusEl = $("status"), saveAll = $("save-all");
+
+  let items = [];          // {file, path, li, state, out: {blob, name, w, h}, note}
+  let runId = 0;
+  let webpOK = true;
+  let downloads = null;
+
+  // ---------- helpers ----------
+  const fmt = (bytes) => bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(bytes / 1024)) + " KB";
+  const preset = () => PRESETS[document.querySelector('input[name="preset"]:checked').value];
+  const toBlob = (canvas, type, q) => new Promise((res) => canvas.toBlob(res, type, q));
+
+  async function detectWebp() {
+    const c = document.createElement("canvas");
+    c.width = c.height = 2;
+    c.getContext("2d").fillRect(0, 0, 2, 2);
+    const b = await toBlob(c, "image/webp", 0.8);
+    return !!b && b.type === "image/webp";
+  }
+
+  async function decode(file) {
+    if (window.createImageBitmap) {
+      try { return await createImageBitmap(file, { imageOrientation: "from-image" }); } catch (e) { /* fall through */ }
+    }
+    return await new Promise((res, rej) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => { URL.revokeObjectURL(url); res(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error("decode")); };
+      img.src = url;
+    });
+  }
+
+  function draw(src, w, h) {
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const ctx = c.getContext("2d");
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(src, 0, 0, w, h);
+    return c;
+  }
+
+  function hasAlpha(src, sw, sh) {
+    const s = Math.min(1, 256 / Math.max(sw, sh));
+    const c = draw(src, Math.max(1, Math.round(sw * s)), Math.max(1, Math.round(sh * s)));
+    const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+    for (let i = 3; i < d.length; i += 4) if (d[i] < 250) return true;
+    return false;
+  }
+
+  // Same search as our build script: cap the longest edge, step quality down to the floor,
+  // then shrink the edge and try again until the file is under the target.
+  async function compress(file, p) {
+    const src = await decode(file);
+    const sw = src.width, sh = src.height;
+    if (!sw || !sh) throw new Error("decode");
+    const target = p.targetKB * 1024;
+
+    let type = "image/webp", ext = "webp";
+    if (!webpOK) {
+      const alpha = /\.(png|webp|avif|tiff?)$/i.test(file.name) && hasAlpha(src, sw, sh);
+      type = alpha ? "image/png" : "image/jpeg";
+      ext = alpha ? "png" : "jpg";
+    }
+
+    let scale = Math.min(1, p.maxEdge / Math.max(sw, sh));
+    let best = null;
+    for (let s = 0; s <= MAX_SHRINKS; s++) {
+      const w = Math.max(1, Math.round(sw * scale)), h = Math.max(1, Math.round(sh * scale));
+      const canvas = draw(src, w, h);
+      const qualities = type === "image/png" ? [1] : [];
+      for (let q = Q_START; q >= Q_FLOOR - 0.001 && type !== "image/png"; q -= Q_STEP) qualities.push(q);
+      for (const q of qualities) {
+        const blob = await toBlob(canvas, type, q);
+        if (!blob) throw new Error("encode");
+        if (!best || blob.size < best.blob.size) best = { blob, w, h };
+        if (blob.size <= target) { best = { blob, w, h }; s = MAX_SHRINKS + 1; break; }
+      }
+      scale *= SHRINK;
+    }
+    if (src.close) src.close();
+
+    // Never hand back something bigger than what came in.
+    const fitsAlready = Math.max(sw, sh) <= p.maxEdge && /\.(jpe?g|png|webp)$/i.test(file.name);
+    if (fitsAlready && best.blob.size >= file.size) {
+      return { blob: file, ext: null, w: sw, h: sh, sw, sh, kept: true };
+    }
+    return { blob: best.blob, ext, w: best.w, h: best.h, sw, sh, over: best.blob.size > target * CEILING };
+  }
+
+  // ---------- collecting files ----------
+  function readEntries(reader) {
+    return new Promise((res, rej) => reader.readEntries(res, rej));
+  }
+  async function walk(entry, out) {
+    if (entry.isFile) {
+      const file = await new Promise((res, rej) => entry.file(res, rej));
+      out.push({ file, path: entry.fullPath.replace(/^\//, "") });
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      for (;;) {
+        const batch = await readEntries(reader);
+        if (!batch.length) break;
+        for (const e of batch) await walk(e, out);
+      }
+    }
+  }
+  async function fromDrop(dt) {
+    const out = [];
+    const entries = [];
+    for (const it of dt.items || []) {
+      const e = it.webkitGetAsEntry ? it.webkitGetAsEntry() : null;
+      if (e) entries.push(e);
+    }
+    if (entries.length) {
+      for (const e of entries) { try { await walk(e, out); } catch (err) { /* skip unreadable folder */ } }
+    } else {
+      for (const f of dt.files || []) out.push({ file: f, path: f.name });
+    }
+    return out;
+  }
+  const fromInput = (input) => [...input.files].map((f) => ({ file: f, path: f.webkitRelativePath || f.name }));
+
+  function add(found) {
+    const usable = found.filter(({ file, path }) => {
+      const n = path.split("/").pop();
+      if (n.startsWith(".")) return false;
+      return RASTER.test(n) || PASS.test(n) || file.type.startsWith("image/");
+    });
+    const skipped = found.length - usable.length;
+    if (!usable.length) {
+      results.hidden = false;
+      statusEl.textContent = found.length ? "No images found in what you added." : "";
+      return;
+    }
+    for (const u of usable) {
+      const item = { file: u.file, path: u.path, state: "wait", out: null, note: "" };
+      item.li = makeRow(item);
+      list.appendChild(item.li);
+      items.push(item);
+    }
+    results.hidden = false;
+    run(skipped);
+  }
+
+  // ---------- rows ----------
+  function makeRow(item) {
+    const li = document.createElement("li");
+    li.className = "item";
+    const img = document.createElement("img");
+    img.className = "thumb"; img.alt = "";
+    const info = document.createElement("div"); info.className = "info";
+    const name = document.createElement("span"); name.className = "name"; name.textContent = item.path;
+    const meta = document.createElement("span"); meta.className = "meta"; meta.textContent = fmt(item.file.size);
+    info.append(name, meta);
+    const side = document.createElement("div"); side.className = "side";
+    const chip = document.createElement("span"); chip.className = "chip wait"; chip.textContent = "Waiting";
+    const btn = document.createElement("button"); btn.type = "button"; btn.className = "small"; btn.textContent = "Save"; btn.hidden = true;
+    btn.addEventListener("click", () => saveOne(item));
+    side.append(chip, btn);
+    li.append(img, info, side);
+    item.el = { img, name, meta, chip, btn };
+    return li;
+  }
+
+  function paint(item) {
+    const { img, name, meta, chip, btn } = item.el;
+    if (item.thumbUrl) { URL.revokeObjectURL(item.thumbUrl); item.thumbUrl = null; }
+    btn.hidden = true;
+    if (item.state === "wait") { chip.className = "chip wait"; chip.textContent = "Waiting"; meta.textContent = fmt(item.file.size); return; }
+    if (item.state === "work") { chip.className = "chip wait"; chip.textContent = "Compressing"; return; }
+    if (item.state === "fail") { chip.className = "chip bad"; chip.textContent = "Could not read"; meta.textContent = fmt(item.file.size) + " · not included"; return; }
+    const o = item.out;
+    item.thumbUrl = URL.createObjectURL(o.blob);
+    img.src = item.thumbUrl;
+    name.textContent = o.name;
+    btn.hidden = !downloads && !!window.claude;
+    if (o.kept) {
+      chip.className = "chip"; chip.textContent = "Kept as is";
+      meta.textContent = fmt(o.blob.size) + (o.w ? " · " + o.w + " × " + o.h + " px" : "") + " · " + item.note;
+      return;
+    }
+    const saved = Math.min(99, Math.round((1 - o.blob.size / item.file.size) * 100));
+    meta.textContent = fmt(item.file.size) + " → " + fmt(o.blob.size) + " · " + o.w + " × " + o.h + " px" + (item.note ? " · " + item.note : "");
+    chip.className = o.over ? "chip warn" : "chip";
+    chip.textContent = o.over ? "Still large" : (saved > 0 ? saved + "% smaller" : "Done");
+  }
+
+  function uniqueName(path, used) {
+    let candidate = path, n = 2;
+    const dot = path.lastIndexOf(".");
+    while (used.has(candidate.toLowerCase())) {
+      candidate = path.slice(0, dot) + "-" + n++ + path.slice(dot);
+    }
+    used.add(candidate.toLowerCase());
+    return candidate;
+  }
+
+  // ---------- run ----------
+  async function run(skipped) {
+    const mine = ++runId;
+    const p = preset();
+    const used = new Set();
+    for (const it of items) if (it.state === "done") used.add(it.out.name.toLowerCase());
+    saveAll.disabled = true;
+    const todo = items.filter((it) => it.state === "wait");
+    let n = items.length - todo.length;
+    for (const item of todo) {
+      if (mine !== runId) return;
+      item.state = "work"; paint(item);
+      statusEl.textContent = "Compressing " + (n + 1) + " of " + items.length + "…";
+      $("progress-fill").style.width = Math.round((n / items.length) * 100) + "%";
+      try {
+        if (PASS.test(item.path)) {
+          item.out = { blob: item.file, name: uniqueName(item.path, used), kept: true };
+          item.note = /\.svg$/i.test(item.path) ? "vector logo, no compression needed" : "animated files are not changed";
+        } else {
+          const r = await compress(item.file, p);
+          if (mine !== runId) return;
+          const outPath = r.kept ? item.path : item.path.replace(/\.[^./]+$/, "") + "." + r.ext;
+          item.out = { blob: r.blob, name: uniqueName(outPath, used), w: r.w, h: r.h, kept: r.kept, over: r.over };
+          item.note = r.kept ? "already small enough" : (r.over ? "could not reach the target without visible quality loss" : "");
+        }
+        item.state = "done";
+      } catch (e) {
+        item.state = "fail";
+      }
+      paint(item);
+      n++;
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    if (mine !== runId) return;
+    $("progress-fill").style.width = "100%";
+    totals();
+    const failed = items.filter((it) => it.state === "fail").length;
+    const bits = ["Finished at the " + p.label + " size."];
+    if (failed) bits.push(failed + " could not be read.");
+    if (skipped) bits.push(skipped + " other " + (skipped === 1 ? "file was" : "files were") + " ignored.");
+    statusEl.textContent = bits.join(" ");
+  }
+
+  function totals() {
+    const done = items.filter((it) => it.state === "done");
+    const before = done.reduce((s, it) => s + it.file.size, 0);
+    const after = done.reduce((s, it) => s + it.out.blob.size, 0);
+    $("total-line").textContent = done.length + (done.length === 1 ? " image ready" : " images ready");
+    $("total-sub").textContent = done.length ? fmt(before) + " → " + fmt(after) + (before > after ? " · " + Math.min(99, Math.round((1 - after / before) * 100)) + "% smaller" : "") : "";
+    saveAll.disabled = !done.length || (!downloads && !!window.claude);
+  }
+
+  function reset() {
+    runId++;
+    for (const it of items) if (it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
+    items = [];
+    list.textContent = "";
+    results.hidden = true;
+    statusEl.textContent = "";
+    $("progress-fill").style.width = "0";
+  }
+
+  function rerun() {
+    if (!items.length) return;
+    for (const it of items) { it.state = "wait"; it.out = null; it.note = ""; it.el.name.textContent = it.path; it.el.img.removeAttribute("src"); paint(it); }
+    run(0);
+  }
+
+  // ---------- zip (stored, no extra compression: WebP and JPG are already compressed) ----------
+  const CRC = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+    return t;
+  })();
+  function crc32(bytes) {
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < bytes.length; i++) c = CRC[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  async function buildZip(files) {
+    const enc = new TextEncoder();
+    const now = new Date();
+    const time = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+    const date = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+    const parts = [], central = [];
+    let offset = 0;
+    for (const f of files) {
+      const name = enc.encode(f.name);
+      const bytes = new Uint8Array(await f.blob.arrayBuffer());
+      const crc = crc32(bytes);
+      const head = new DataView(new ArrayBuffer(30));
+      head.setUint32(0, 0x04034b50, true); head.setUint16(4, 20, true); head.setUint16(6, 0x0800, true);
+      head.setUint16(8, 0, true); head.setUint16(10, time, true); head.setUint16(12, date, true);
+      head.setUint32(14, crc, true); head.setUint32(18, bytes.length, true); head.setUint32(22, bytes.length, true);
+      head.setUint16(26, name.length, true); head.setUint16(28, 0, true);
+      parts.push(head.buffer, name, f.blob);
+      const cd = new DataView(new ArrayBuffer(46));
+      cd.setUint32(0, 0x02014b50, true); cd.setUint16(4, 20, true); cd.setUint16(6, 20, true); cd.setUint16(8, 0x0800, true);
+      cd.setUint16(10, 0, true); cd.setUint16(12, time, true); cd.setUint16(14, date, true);
+      cd.setUint32(16, crc, true); cd.setUint32(20, bytes.length, true); cd.setUint32(24, bytes.length, true);
+      cd.setUint16(28, name.length, true); cd.setUint32(42, offset, true);
+      central.push(cd.buffer, name);
+      offset += 30 + name.length + bytes.length;
+    }
+    const cdSize = central.reduce((s, b) => s + b.byteLength, 0);
+    const end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true);
+    end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+    end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+    return new Blob([...parts, ...central, end.buffer], { type: "application/zip" });
+  }
+
+  // ---------- saving ----------
+  async function save(filename, blob) {
+    if (downloads) {
+      try {
+        await downloads.save({ filename, data: blob });
+        statusEl.textContent = "Saved " + filename + ".";
+      } catch (e) {
+        const code = e && e.code;
+        if (code === "declined") statusEl.textContent = "Download cancelled.";
+        else if (code === "rate_limited") statusEl.textContent = "Please wait a moment, then try the download again.";
+        else if (code === "host_unavailable") statusEl.textContent = "This app cannot save files. Open this page in a browser on a computer to download.";
+        else statusEl.textContent = "The download did not go through. Try again, or open this page in a browser on a computer.";
+      }
+      return;
+    }
+    if (!window.claude) {           // opened as a plain file, outside the viewer
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      statusEl.textContent = "Saved " + filename + ".";
+    }
+  }
+  function saveOne(item) {
+    if (item.state === "done") save(item.out.name.split("/").pop(), item.out.blob);
+  }
+  async function saveZip() {
+    const done = items.filter((it) => it.state === "done");
+    if (!done.length) return;
+    saveAll.disabled = true;
+    statusEl.textContent = "Preparing the zip…";
+    try {
+      const zip = await buildZip(done.map((it) => ({ name: it.out.name, blob: it.out.blob })));
+      await save("compressed-images.zip", zip);
+    } catch (e) {
+      statusEl.textContent = "The zip could not be made. Save the images one at a time instead.";
+    }
+    saveAll.disabled = false;
+  }
+
+  // ---------- wiring ----------
+  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", async (e) => { add(await fromDrop(e.dataTransfer)); });
+  window.addEventListener("dragover", (e) => e.preventDefault());
+  window.addEventListener("drop", (e) => e.preventDefault());
+  $("pick-files").addEventListener("change", (e) => { add(fromInput(e.target)); e.target.value = ""; });
+  $("pick-folder").addEventListener("change", (e) => { add(fromInput(e.target)); e.target.value = ""; });
+  if (!("webkitdirectory" in document.createElement("input"))) $("pick-folder-wrap").hidden = true;
+  document.querySelectorAll('input[name="preset"]').forEach((r) => r.addEventListener("change", rerun));
+  $("clear").addEventListener("click", reset);
+  saveAll.addEventListener("click", saveZip);
+
+  detectWebp().then((ok) => { webpOK = ok; $("webp-notice").hidden = ok; });
+
+  if (window.claude && window.claude.use) {
+    window.claude.use("downloads").then((d) => {
+      downloads = d;
+      if (!d) {
+        const n = document.createElement("div");
+        n.className = "notice";
+        n.textContent = "Saving is not available in this view. Use the web version instead: ";
+        const link = document.createElement("a");
+        link.href = "https://tools.hutch-co.com/image-compressor/";
+        link.textContent = "tools.hutch-co.com/image-compressor";
+        link.style.color = "inherit";
+        n.appendChild(link);
+        results.before(n);
+      }
+      for (const it of items) if (it.state === "done") paint(it);
+      if (items.length) totals();
+    });
+  }
+})();
+</script>
+
+</body>
+</html>
